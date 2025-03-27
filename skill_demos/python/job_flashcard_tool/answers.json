@@ -1,0 +1,98 @@
+{
+    "Question 1": {
+        "Question": "In a distributed, cloud-based environment, how do you determine which metrics, logs, and traces provide the clearest picture of overall system health? Where do you typically start?",
+        "Answer": "So, I typically investigate the type of environment and type of application first. For example, if it's a customer facing application that's based around a webpage, that useses data from middleware or backend systems that's outside of the development team that I'm on then I would track HTTP errors as seen from the Post/Get requests we are sending to other parts of the distrubuted system outside of our control, as well as HTTP errors and Web errors that are being being presented or given to the user, and those would be collected from synthetic based browser tests as well as the load balancer or whatever is at the edge of the defined infrastructure/application closet to the customers POV. As far as logs I would implement APM if it wasn't already implemented so that it would give a clear view of what's occuring and how. "
+    },
+    "Question 2": {
+        "Question": "What strategies have you found successful to unify monitoring for networks, servers, and AWS services under one observability platform?",
+        "Answer": "So generally in an optimum environment we would use something like datdog that naturally does something like that out of the box. Failing to be able to use something like that I would use something like Grafana or ELK that have the ability to ingest metrics and data from multiple other logging and metrics tools into a single pane of glass, now that we have that established, let's term it \"single pane of glass\" the reason that we do that is that it allows for us (SREs) to present the information in a way that allows ML/AI to function or allows production support and by association any engineer, to correlate associated and direct behavior of components and lends itself towards RCA, Post-Mortems, MTTA and MTTR"
+    },
+    "Question 3": {
+        "Question": "Can you share an example of a time you introduced a new monitoring or logging tool? What was the rollout process like, and how did you measure success?",
+        "Answer": "So for this I would say implementing APM with appdynamics. The rollout for this was painful because the infrasturcture, Pivotal Cloud Foundry did not lend itself to easily work with JVMs already and so implementing APM was not as easy as it should have been if say we were running out of a more industry standardize docker container, kube container or ecs/app service type deployment. As far as how we measured success, we were able to measure latency and tracing across the application, the way it interacted with other apis (and thus other applications) as well as database sources a lot easier and determine where and what were causing service interuptions. A close second would be when we implemented unique transaction ids in the logging of all the microservices so that we could have the unique id handed off in the data structure which allowed for correlation of said transaction back to the database which allowed us to perform daily reconcilations of processed/missed financial transactions. This was implemented prior to APM, we moved to APM so that we could use functionality inherent in the telemetry tool."
+    },
+    "Question 4": {
+        "Question": "How do you balance capturing detailed logs for troubleshooting with the need to control storage costs and avoid information overload?",
+        "Answer": "So, if we're talking about using a tool like datadog then we have the option to use functionality in datadog like log sampling/filtering, using \"active logs\" versus \"archived logs\" and setting a active window so that logs that expire are automatically archived, and setting an overall retention period for said logs. If we're using something like ELK or Grafana then it's still achieveable however not as simple as button click but the concepts are still the same. As far as information overload, a lot of that is outside the control of the telemtry tool and so it's best to look at the code base (especially if there's already an error class) and seeing what field data is being captured and placed inside of the datastructure that is eventually output to the logs. For me personally, just making sure that logging levels are implemented, that we are capturing HTTP codes and that Error Codes are being correctly handeld and put into the right methods/functions in the error class so that they are correct, i.e type errors should not report as say internal service error and vice versa, we'd also want a unqiue transaction id that's being carried for the transaction session and lastly that we are getting a organized stack trace instead of a raw stack trace, assuming we standardize the logs like this then it allows us to implement things like filtering and sampling with confidence."
+    },
+    "Question 5": {
+        "Question": "How do you design AWS architectures that meet high availability and disaster recovery requirements, but still remain mindful of cost constraints? Any best practices you have adopted?",
+        "Answer": "So I first would establish the functional requirements, and financial impact of the application, simply approaching it from a architecture only standpoint does not allow you to make intelligent choices. Second, once you know the functional requirements and financial impact of the application, it allows you to make the choices between things like hot/hot, or hot/cold, blue/green deployments, kubernetes versus ecs versus ec2 monolith, scaleable messaging services like reddis/kafka versus sqs/sms, and coupled clustered databases versus decoupled clustered databases with replication"
+    },
+    "Question 6": {
+        "Question": "Can you walk me through how you've used AWS networking services such as VPC, Direct Connect, or Transit Gateway to achieve both high performance and security in a multi-account setup?",
+        "Answer": "I don't have an answer for this, can you please assist me"
+    },
+    "Question 7": {
+        "Question": "What's your approach for scaling and load balancing traffic across AWS regions, particularly when you need near-zero downtime globally?",
+        "Answer": "I don't have a good answer for this can you please assist me"
+    },
+    "Question 8": {
+        "Question": "Have you ever faced a scenario where you had to refactor an overly complex, costly AWS environment to something leaner? How did you manage that project?",
+        "Answer": "I don't have an answer to this question, can you please assist me"
+    },
+    "Question 9": {
+        "Question": "When planning for database high availability (MS SQL or PostgreSQL), how do you weigh the benefits and trade-offs of synchronous vs. asynchronous replication?",
+        "Answer": "I don't have an intelligent answer for this can you please outline the usescases for both, the pros and cons of both, etc."
+    },
+    "Question 10": {
+        "Question": "How have you approached database capacity planning in the cloud to ensure performance without over-provisioning? Any metrics or cost levers you focus on?",
+        "Answer": "Yes, and I'm happy you could ask this question as proper capacity planning allows for running a lean environment. The first would be establishing a week over week, month over month historical consumption report, the reason why you would do this is that it would allow you to have a fairly accurate projected use. Once you have that projected use you can then approach it from 2 avenues, the first avenue is from a annual basis, and you would typically use the annual approach if you requisition->approval->grant process of the resources takes several months. When you do the calculation, you would take your projected storage amount (let's say you project 10%db growth after accounting for data that expires and destroys itself) you would then request this +5% - the amount of free data you are currently at versus total space so that you can stay at a calculated free%. The second approach would be approaching it quarterly, you'd use the same math as the annual approach while taking into account the requistion process. Using quarterly would be much better for a product that is newer and thus could experience exponential growth or use especially if the retention for the data is expected to obey PCI compliance which requires 7 year retention. If it's an established application or service where you have reliable growth markers and know you'll have data fall-off then annual projects may be better. "
+    },
+    "Question 11": {
+        "Question": "If you've integrated network considerations into a database environment, how do you ensure fast, reliable connectivity for your database cluster, for example via VPN or AWS PrivateLink?",
+        "Answer": "So please explain VPN or AWS private-link and how this relates? Aside from that I typically always take into account the network and connection parameters into a database environment. The reason I do this is so that it allows you to correctly set your TTL for database connections as well as read/write considerations into locking data and replication. Additionally, establishing good session use such as closing unused connections or closing inactive connections allows you to have a better understand of the DB use as well."
+    },
+    "Question 12": {
+        "Question": "What strategies have you used to troubleshoot or optimize network-related latency in database queries, especially under heavy load?",
+        "Answer": "So typically when I troubleshoot databases I like to whitebox the database, what I mean by this is making sure that I can pull those metrics and data into Datadog for example so that I can see the full picture when looking at APM and traces. That said, when I look at tuning database queries I believe that you should make them as concise as possible and stay away from using wild cards whenever possible so that it avoids unnesscary datasets when the specific key values or field values are already known. Lastly, I think it's also good to fix overlooked things like replication behavior, read/write concerns and backup schuedules as well so that you can approach tuning of the databases from every angle which lends itself to optomizing the queries."
+    },
+    "Question 13": {
+        "Question": "As a technical lead overseeing systems and cloud engineering teams, how do you align multiple stakeholders, like network engineers, developers, and SREs, to a single roadmap?",
+        "Answer": "I don't have a good answer for this. Please reccomend."
+    },
+    "Question 14": {
+        "Question": "Tell me about a time you implemented a major infrastructure change. How did you communicate the benefits and risks to leadership and end users?",
+        "Answer": "I would say the time I reccomend moving from Kubernetes to ECS would be one of those times. The reason we made the change was that we did not need the HA features that we were paying for and never using in Kubernetes which ECS met our availibiltiy requirements just fine. As far as the benefits and risks, those were presented very plainly in a powerpoint. I think the best approach when approaching this scenario is to establish a pattern first or use an established pattern of approach. I.e - What do we currently have? What are we currently doing with it? Is there an alternative that meets all our needs that's cheaper? What are the negatives of the alternative versus what we are currently using?. Once you standarize the analysis and approach the communication and presentation kind of handles itself."
+    },
+    "Question 15": {
+        "Question": "What does mentorship look like for you when guiding junior systems engineers or cloud operations specialists toward best practices?",
+        "Answer": "So I fully believe that leading from the front, leading by example and demonstrating that you're willing to do everything and anything you'd ask someone else to do inspires a lot of respect and fosters morale better than simple standing on a soap box and \"managing\" or \"being senior\". The reason I mention this is that when you are in a senior position or a manager and you are expected to mentor and lead people it's easier to do so when you understand exactly what it is you are asking them to do, it allows them to more easily communicate issues they are having because they \"know\" you can relate, and lastly it makes them a lot more forgiving of hard items you ask them to do because the perception is that you are invested in them and the team."
+    },
+    "Question 16": {
+        "Question": "How do you encourage cross-team collaboration to prevent knowledge silos within networking, systems, and cloud engineering domains?",
+        "Answer": "Realistically I like to set-up weekly cross-team meetings where we can talk about a prominenent issue that required multiple teams. This discussion fosters knowledge sharing, allows teams to view invidiuals from partner teams with more familarity and increases the level of comfort when people on either team need to interact with individuals on the other teams."
+    },
+    "Question 17": {
+        "Question": "What's your experience with defining SLIs and SLOs for infrastructure services like networking or load balancers, which aren't always user-facing in the traditional sense?",
+        "Answer": "So my experience is pretty robust when it comes to this. I typically like to gather SLIs into 3 categories, resource (ram,processor,storage,consumption), availibility (this is primarily driven by healthcheck synthetics, browser synthetics, and http codes collected from network infra), and latency which primarily is a behavioral indicator that's driven by resource and feeding into availibility"
+    },
+    "Question 18": {
+        "Question": "How do you see error budgets applying to system-level components, such as DNS or network layers, where downtime can be catastrophic?",
+        "Answer": "So personally, I don't think that it's healthy to abstract error-budgets and isolate them to system or network level components because if this is happening it typically means that your team has no control over other facets of an application which inhereitantly means your handling your billiables are a level that's too granular. If you're viewing error-budgets for system level components it means that you're not approaching capcity planning and SLOs correctly when it comes to the application which inevitiably drives the budget for the infra"
+    },
+    "Question 19": {
+        "Question": "Have you implemented or led efforts to automate away toil in network or systems administration? What tools or scripts did you find most effective?",
+        "Answer": "Yes, I have on multiple occasions. As far as tools, I believe in using the best tool for the job and building it with a fast development language like ruby, golang, or python when the tool doesn't exist. That said, I don't believe in automation and \"toil reduction\" when the time/people cost of doing so exceeds the cost of the toil. For example, if it takes 12 hours to build something or automate it, and it the toil added up over a year would barely add up to 12 hours then I would argue that it's a nice to have and not a must have. Conversely, if it takes 12 hours to build it and the yearly cost is 1200 hours, then it's obvious that it's a worthwhile endeavor."
+    },
+    "Question 20": {
+        "Question": "When dealing with incidents that cross both network and application boundaries, what's your strategy for root-cause analysis and cross-functional postmortems?",
+        "Answer": "So it really depends on the level of permissions and access that I as that resolver or person investigating the issue have when it comes to investigation. If I have full visibility at all levels of the issue then it's most likely faster to have 1 person drive the RCA and Post-Mortem and then have the infra team or dev team sign off/certify the invesitgation versus duplicating efforts. If it's a scenario where access is segregated and compartmentalized then having individual engineers all come up with a review of the components they are responsible for, have 1 engineer or person fit all the pieces together and then have a discussion and certification of the results."
+    },
+    "Question 21": {
+        "Question": "In your experience, what key metrics do you track to ensure database performance is both stable and predictable for mission-critical applications?",
+        "Answer": "So realistically, average latency for db requests (read/write) average query runtimes for each query, and measuring failures versus successful db operations. It's pretty straight forward"
+    },
+    "Question 22": {
+        "Question": "How do you integrate database query metrics or slow-query logs into a broader observability platform, such as Kibana, Grafana, or Datadog?",
+        "Answer": "So Kibana and Grafana typically don't have sass maintained plugins that do all the work for you. So in those 2 instances once you ingest the Databse logs/metrics then you'll need to write the queries to build the widgets and views to pull into a dashboard. When it comes to datadog, depending on the DB your using, the vendor maintained plugins typically have the tables, widgets, and views already built and put into a vendor provided dashboard (mongo is a good example of this) that integrates well with APM to provide a full view into the behavior of the Database and way the Application is interacting with the database. "
+    },
+    "Question 23": {
+        "Question": "Could you describe a time when observability data led you to identify and resolve a hidden performance bottleneck in the database layer?",
+        "Answer": "This story is too subjective. Let's skip"
+    },
+    "Question 24": {
+        "Question": "How do you ensure logs and metrics from MS SQL or PostgreSQL remain actionable and manageable as datasets grow?",
+        "Answer": "So I think a lot of whether things remain actionable is making sure that your measuring apperatuses don't become too generalized as growth or added functionality could lead the measurements to being too abstracted. A good example is the complexity of queries. IF your average healthy query run times range from milliseconds to several seconds I'd argue that it's impossible to intelligently combine those and you should measure the queries independtly. Conversely, if all your write queries typicaly take 1 second +/- like a 5% variance of eachother and your read queries follow that behavior then having a genralized view of read versus write is workable."
+    }
+}
