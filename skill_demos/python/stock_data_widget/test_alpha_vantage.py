@@ -7,7 +7,7 @@ from alpha_vantage.timeseries import TimeSeries
 import pandas as pd
 
 # Replace this string with your actual Alpha Vantage API key
-API_KEY = "XXXXXXXXXXXXXXX"
+API_KEY = "XP3RU7II4Q8BQE9W"
 
 # Initialize the TimeSeries object
 ts = TimeSeries(key=API_KEY, output_format='pandas')
