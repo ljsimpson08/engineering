@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+
+# ------------------------------------------------------------------------------
+# Verbose, graceful rebrand + build + package for an existing local project
+# ✅ Logs to file
+# ✅ Keeps terminal window open at the end
+# ✅ Fixed directory name (hyphen vs underscore)
+# ✅ Removed company branding
+# ------------------------------------------------------------------------------
+
+# --- Logging Setup ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
+LOG_FILE="$SCRIPT_DIR/rebrand_$TIMESTAMP.log"
+
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "==========================================="
+echo "📝 Rebrand Script Started — $(date)"
+echo "📜 Log file: $LOG_FILE"
+echo "==========================================="
+
+# --- Defaults ---
+# FIXED: Changed from dynamodb_datasource to dynamodb-datasource (hyphen, not underscore)
+PROJECT_DIR="$(pwd)/dynamodb-datasource"
+# FIXED: Removed "company-" prefix per requirements
+PLUGIN_ID="dynamodb-datasource"
+# FIXED: Removed "(Internal)" company reference
+PLUGIN_NAME="DynamoDB DataSource"
+VERSION="1.0.0"
+OUT_DIR="$(pwd)/artifacts"
+INSTALL_LOCAL="false"
+ALLOW_UNSIGNED="false"
+INCLUDE_SRC="true"
+VERBOSE="true"
+ERROR_FLAG=0
+
+# --- Homebrew Paths ---
+HOMEBREW_PREFIX="$(/usr/bin/which brew >/dev/null 2>&1 && brew --prefix || true)"
+if [[ -n "${HOMEBREW_PREFIX:-}" ]]; then
+  DEFAULT_PLUGINS_DIR="$HOMEBREW_PREFIX/var/lib/grafana/plugins"
+  DEFAULT_GRAFANA_INI="$HOMEBREW_PREFIX/etc/grafana/grafana.ini"
+else
+  DEFAULT_PLUGINS_DIR="/usr/local/var/lib/grafana/plugins"
+  DEFAULT_GRAFANA_INI="/usr/local/etc/grafana/grafana.ini"
+fi
+PLUGINS_DIR="$DEFAULT_PLUGINS_DIR"
+GRAFANA_INI="$DEFAULT_GRAFANA_INI"
+
+WORK_DIR="$(mktemp -d -t ddbds-XXXXXX)"
+PKG_DIR="$WORK_DIR/package"
+
+# --- Logging helpers ---
+timestamp() { date +"%Y-%m-%d %H:%M:%S"; }
+log_info() { echo -e "[$(timestamp)] 🟢 INFO: $*"; }
+log_warn() { echo -e "[$(timestamp)] 🟡 WARN: $*" >&2; }
+log_error(){ echo -e "[$(timestamp)] 🔴 ERROR: $*" >&2; ERROR_FLAG=1; }
+
+# --- Utility ---
+need() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    log_error "Missing dependency: $1 (tip: brew install $1)"
+  fi
+}
+
+run_step() {
+  local desc="$1"; shift
+  log_info "➡️  $desc"
+  if "$@"; then
+    log_info "✅ $desc completed"
+  else
+    log_error "❌ $desc failed — continuing…"
+  fi
+}
+
+rewrite_plugin_json() {
+  local root="$1" new_id="$2" new_name="$3"
+  local files=()
+  while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$root" -type f -name "plugin.json" -print0)
+  if [[ ${#files[@]} -eq 0 ]]; then
+    log_error "plugin.json not found under: $root"
+    return 1
+  fi
+  for pj in "${files[@]}"; do
+    log_info "Rewriting $pj → id=$new_id, name=$new_name"
+    cp "$pj" "$pj.bak"
+    local tmp; tmp="$(mktemp)"
+    jq --arg id "$new_id" --arg name "$new_name" '.id=$id | .name=$name' "$pj" > "$tmp" && mv "$tmp" "$pj"
+  done
+}
+
+clean_package_json() {
+  local root="$1"
+  local pkg="$root/package.json"
+  if [[ ! -f "$pkg" ]]; then
+    log_warn "package.json not found, skipping cleanup"
+    return 0
+  fi
+  log_info "Removing original repo references from package.json"
+  cp "$pkg" "$pkg.bak"
+  local tmp; tmp="$(mktemp)"
+  # Remove repository, author, bugs, homepage fields that link to original repo
+  jq 'del(.repository) | del(.author) | del(.bugs) | del(.homepage)' "$pkg" > "$tmp" && mv "$tmp" "$pkg"
+}
+
+clean_readme() {
+  local root="$1"
+  local readme="$root/README.md"
+  if [[ ! -f "$readme" ]]; then
+    log_warn "README.md not found, skipping cleanup"
+    return 0
+  fi
+  log_info "Creating generic README.md"
+  cp "$readme" "$readme.bak"
+  cat > "$readme" <<'EOF'
+# DynamoDB DataSource for Grafana
+
+A Grafana datasource plugin for Amazon DynamoDB.
+
+## Installation
+
+1. Copy this plugin to your Grafana plugins directory
+2. Restart Grafana
+3. Add the datasource in Grafana's configuration
+
+## Configuration
+
+Configure your AWS credentials and region in the datasource settings.
+
+## Usage
+
+Create dashboards and panels using DynamoDB as the datasource.
+
+## License
+
+See LICENSE file for details.
+EOF
+}
+
+remove_git_history() {
+  local root="$1"
+  if [[ -d "$root/.git" ]]; then
+    log_info "Removing .git directory to disconnect from original repo"
+    rm -rf "$root/.git"
+  else
+    log_info "No .git directory found"
+  fi
+}
+
+chmod_helpers_if_present() {
+  local root="$1"
+  local files=()
+  while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$root" -type f -name "gpx_dynamodb_datasource_*" -print0 || true)
+  if [[ ${#files[@]} -gt 0 ]]; then
+    log_info "Marking helper binaries executable"
+    for f in "${files[@]}"; do chmod +x "$f" || log_warn "chmod failed: $f"; done
+  fi
+}
+
+package_layout() {
+  local src="$1" dst="$2"
+  mkdir -p "$dst"
+  if [[ "$INCLUDE_SRC" == "true" ]]; then
+    rsync -a --exclude ".git" --exclude ".github" --exclude "node_modules" --exclude ".cache" --exclude "tmp" --exclude "yarn.lock" "$src"/ "$dst"/
+  else
+    mkdir -p "$dst/dist"
+    [[ -d "$src/dist" ]] && rsync -a "$src/dist/" "$dst/dist/"
+    for f in plugin.json LICENSE README.md package.json package-lock.json; do
+      [[ -f "$src/$f" ]] && cp "$src/$f" "$dst/" || true
+    done
+    [[ -f "$src/src/plugin.json" ]] && mkdir -p "$dst/src" && cp "$src/src/plugin.json" "$dst/src/"
+  fi
+}
+
+zip_dir() {
+  local src_dir="$1" out_zip="$2"
+  (cd "$src_dir/.." && zip -r "$out_zip" "$(basename "$src_dir")" >/dev/null 2>&1)
+}
+
+install_locally() {
+  local src_dir="$1" dest_dir="$2" id="$3"
+  mkdir -p "$dest_dir/$id"
+  rsync -a --delete "$src_dir"/ "$dest_dir/$id"/
+}
+
+brew_restart_hint() {
+  cat <<'EOF'
+
+------------------------------------------
+👉 To restart Grafana:
+  brew services restart grafana
+👉 Then open:
+  http://localhost:3000
+(Default login: admin / admin)
+------------------------------------------
+EOF
+}
+
+unsigned_hint() {
+  local id="$1" ini="$2"
+  cat <<EOF
+
+------------------------------------------
+⚠️  Allow unsigned plugin
+Option 1 (temporary):
+  export GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=$id
+
+Option 2 (persistent):
+  Edit:
+    $ini
+  Add:
+    [plugins]
+    allow_loading_unsigned_plugins = $id
+------------------------------------------
+EOF
+}
+
+# --- Args ---
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --project-dir) PROJECT_DIR="$2"; shift 2;;
+    --plugin-id)   PLUGIN_ID="$2"; shift 2;;
+    --plugin-name) PLUGIN_NAME="$2"; shift 2;;
+    --version)     VERSION="$2"; shift 2;;
+    --out-dir)     OUT_DIR="$2"; shift 2;;
+    --plugins-dir) PLUGINS_DIR="$2"; shift 2;;
+    --grafana-ini) GRAFANA_INI="$2"; shift 2;;
+    --install-local) INSTALL_LOCAL="true"; shift 1;;
+    --allow-unsigned) ALLOW_UNSIGNED="true"; shift 1;;
+    --include-src) INCLUDE_SRC="$2"; shift 2;;
+    *) log_warn "Unknown arg: $1"; shift 1;;
+  esac
+done
+
+# --- Preflight ---
+for cmd in jq zip node npm; do need "$cmd"; done
+
+# Check if project directory exists
+if [[ ! -d "$PROJECT_DIR" ]]; then
+  log_error "Project not found: $PROJECT_DIR"
+  log_info "💡 Tip: Make sure you've cloned the repo first:"
+  log_info "   git clone https://github.com/haohanyang/dynamodb-datasource"
+  log_info "   cd dynamodb-datasource/.."
+  log_info "   ./rebrand.sh"
+  echo ""
+  echo "👋 Press [Enter] to close this window..."
+  read -r _
+  exit 1
+fi
+
+mkdir -p "$OUT_DIR"
+ARTIFACT_ZIP="$OUT_DIR/${PLUGIN_ID}-${VERSION}.zip"
+
+log_info "Project dir     : $PROJECT_DIR"
+log_info "Plugin ID/Name  : $PLUGIN_ID / $PLUGIN_NAME"
+log_info "Version         : $VERSION"
+log_info "Out dir         : $OUT_DIR"
+log_info "Plugins dir     : $PLUGINS_DIR"
+log_info "Grafana ini     : $GRAFANA_INI"
+log_info "Log file        : $LOG_FILE"
+
+# --- Steps ---
+run_step "Remove git history (disconnect from original repo)" remove_git_history "$PROJECT_DIR"
+run_step "Rewrite plugin.json (rebrand)" rewrite_plugin_json "$PROJECT_DIR" "$PLUGIN_ID" "$PLUGIN_NAME"
+run_step "Clean package.json (remove repo references)" clean_package_json "$PROJECT_DIR"
+run_step "Clean README.md (remove branding)" clean_readme "$PROJECT_DIR"
+
+run_step "Install deps (npm)" bash -c "cd \"$PROJECT_DIR\" && npm ci || npm install"
+run_step "Build (npm)" bash -c "cd \"$PROJECT_DIR\" && npm run build"
+
+mkdir -p "$PKG_DIR"
+run_step "Stage files for packaging" package_layout "$PROJECT_DIR" "$PKG_DIR"
+run_step "Ensure helper binaries are executable" chmod_helpers_if_present "$PKG_DIR"
+run_step "Create ZIP artifact" zip_dir "$PKG_DIR" "$ARTIFACT_ZIP"
+
+if [[ "$INSTALL_LOCAL" == "true" ]]; then
+  if [[ -d "$PLUGINS_DIR" ]]; then
+    run_step "Install to local Grafana plugins dir" install_locally "$PKG_DIR" "$PLUGINS_DIR" "$PLUGIN_ID"
+    if [[ "$ALLOW_UNSIGNED" == "true" ]]; then
+      unsigned_hint "$PLUGIN_ID" "$GRAFANA_INI"
+    else
+      log_warn "Unsigned plugin not yet enabled — add manually or rerun with --allow-unsigned."
+      unsigned_hint "$PLUGIN_ID" "$GRAFANA_INI"
+    fi
+    brew_restart_hint
+  else
+    log_error "Plugins directory not found: $PLUGINS_DIR (is Grafana installed via Homebrew?)"
+  fi
+fi
+
+# --- Wrap-up ---
+echo "==========================================="
+if [[ "$ERROR_FLAG" -ne 0 ]]; then
+  log_warn "Finished with warnings/errors. Check the log for details."
+else
+  log_info "🎉 All steps completed successfully!"
+fi
+echo "📜 Log file: $LOG_FILE"
+echo "📦 Artifact: $ARTIFACT_ZIP"
+echo "==========================================="
+
+# --- HOLD TERMINAL OPEN ---
+echo ""
+echo "👋 Press [Enter] to close this window..."
+read -r _
+exit 0
