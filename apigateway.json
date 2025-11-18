@@ -1,0 +1,696 @@
+{
+  "id": null,
+  "uid": null,
+  "title": "API Gateway - CloudWatch Overview (v3)",
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "style": "dark",
+  "editable": true,
+  "panels": [
+    {
+      "type": "row",
+      "title": "High-level Health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Availability (%)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @status\n| stats count() as total, sum(case(@status >= 500, 1, 0)) as errors_5xx by bin(1m)\n| stats (1 - errors_5xx / total) * 100 as availability\n| sort @timestamp desc\n| limit 1"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "P99 Latency (ms)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @latency\n| filter ispresent(@latency)\n| stats pct(@latency, 99) as p99_latency_ms by bin(1m)\n| sort @timestamp desc\n| limit 1"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "P95 Latency (ms)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @latency\n| filter ispresent(@latency)\n| stats pct(@latency, 95) as p95_latency_ms by bin(1m)\n| sort @timestamp desc\n| limit 1"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Requests per Second (RPS)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp\n| stats count() as total_requests by bin(1m)\n| stats total_requests / 60.0 as rps\n| sort @timestamp desc\n| limit 1"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s",
+          "decimals": 2
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "type": "row",
+      "title": "Latency & Traffic Over Time (Logs)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Latency (p99, p95, avg) over time (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @latency\n| filter ispresent(@latency)\n| stats pct(@latency, 99) as p99_latency_ms,\n       pct(@latency, 95) as p95_latency_ms,\n       avg(@latency) as avg_latency_ms\n       by bin(1m)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Requests / RPS over time (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp\n| stats count() as total_requests by bin(1m)\n| stats total_requests as requests, total_requests / 60.0 as rps by bin(1m)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+
+    {
+      "type": "row",
+      "title": "Errors & Availability Over Time (Logs)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Availability (%) over time (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @status\n| stats count() as total, sum(case(@status >= 500, 1, 0)) as errors_5xx by bin(1m)\n| stats (1 - errors_5xx / total) * 100 as availability by bin(1m)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "decimals": 2 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
+    },
+
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Error Rates (4xx, 5xx) over time (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @status\n| stats count() as total,\n       sum(case(@status >= 400 and @status < 500, 1, 0)) as errors_4xx,\n       sum(case(@status >= 500, 1, 0)) as errors_5xx\n       by bin(1m)\n| stats (errors_4xx / total) * 100 as error_rate_4xx_pct,\n       (errors_5xx / total) * 100 as error_rate_5xx_pct\n       by bin(1m)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "decimals": 2 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+
+    {
+      "type": "row",
+      "title": "Endpoint-Level Insights (Logs)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Top Error Endpoints (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @status, @requestPath\n| filter @status >= 400\n| stats count() as error_count by @requestPath, @status\n| sort error_count desc\n| limit 20"
+        }
+      ],
+      "options": { "showHeader": true },
+      "fieldConfig": {
+        "defaults": { "unit": "none" },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Slowest Endpoints (p95) (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @latency, @requestPath\n| filter ispresent(@latency)\n| stats pct(@latency, 95) as p95_latency_ms,\n       avg(@latency) as avg_latency_ms,\n       count() as hits\n       by @requestPath\n| sort p95_latency_ms desc\n| limit 20"
+        }
+      ],
+      "options": { "showHeader": true },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+
+    {
+      "type": "row",
+      "title": "Method / Status Overview (Logs)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Method + Status Breakdown (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @httpMethod, @status\n| stats count() as count by @httpMethod, @status\n| sort count desc"
+        }
+      ],
+      "options": { "showHeader": true },
+      "fieldConfig": {
+        "defaults": { "unit": "none" },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Integration vs Total Latency (avg) (Logs)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Logs",
+          "logGroupNames": [ "$log_group" ],
+          "queryString": "fields @timestamp, @latency, @integrationLatency\n| filter ispresent(@latency)\n| stats avg(@latency) as avg_total_latency_ms,\n       avg(@integrationLatency) as avg_integration_latency_ms\n       by bin(1m)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+
+    {
+      "type": "row",
+      "title": "CloudWatch Metrics - API Gateway",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Requests (Count) from Metrics",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "Count",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["Sum"],
+          "period": "60"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Latency (p99 / p95 / avg) – Metrics",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "P99",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "Latency",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["p99"],
+          "period": "60"
+        },
+        {
+          "refId": "P95",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "Latency",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["p95"],
+          "period": "60"
+        },
+        {
+          "refId": "AVG",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "Latency",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["Average"],
+          "period": "60"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Error Counts (4xx / 5xx) – Metrics",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "4xx",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "4xxError",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["Sum"],
+          "period": "60"
+        },
+        {
+          "refId": "5xx",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "5xxError",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["Sum"],
+          "period": "60"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Throttles & Cache (Metrics)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "YOUR_CLOUDWATCH_DS_UID"
+      },
+      "targets": [
+        {
+          "refId": "THROTTLES",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "ThrottleCount",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["Sum"],
+          "period": "60"
+        },
+        {
+          "refId": "CACHEHIT",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "CacheHitCount",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["Sum"],
+          "period": "60"
+        },
+        {
+          "refId": "CACHEMISS",
+          "region": "$region",
+          "queryMode": "Metrics",
+          "namespace": "AWS/ApiGateway",
+          "metricName": "CacheMissCount",
+          "dimensions": {
+            "ApiName": "$api_name",
+            "Stage": "$stage"
+          },
+          "statistics": ["Sum"],
+          "period": "60"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    }
+  ],
+
+  "templating": {
+    "list": [
+      {
+        "name": "region",
+        "type": "query",
+        "label": "AWS Region",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "YOUR_CLOUDWATCH_DS_UID"
+        },
+        "query": "regions()",
+        "refresh": 2,
+        "current": {
+          "text": "us-east-1",
+          "value": "us-east-1"
+        },
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "name": "log_group",
+        "type": "query",
+        "label": "Log Group",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "YOUR_CLOUDWATCH_DS_UID"
+        },
+        "query": "log_groups()",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "/aws/apigateway/CHANGE_ME_LOG_GROUP",
+          "value": "/aws/apigateway/CHANGE_ME_LOG_GROUP"
+        }
+      },
+      {
+        "name": "api_name",
+        "type": "textbox",
+        "label": "API Name (AWS/ApiGateway)",
+        "query": "",
+        "current": {
+          "text": "CHANGE_ME_API_NAME",
+          "value": "CHANGE_ME_API_NAME"
+        }
+      },
+      {
+        "name": "stage",
+        "type": "textbox",
+        "label": "Stage",
+        "query": "",
+        "current": {
+          "text": "prod",
+          "value": "prod"
+        }
+      }
+    ]
+  },
+
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s","10s","30s","1m","5m","15m","30m","1h"
+    ]
+  }
+}
